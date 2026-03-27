@@ -1,0 +1,16 @@
+FROM golang:1.23-alpine
+
+WORKDIR /app
+ENV DOCKERIZE_VERSION v0.6.0
+RUN go install github.com/cosmtrek/air@v1.49.0
+RUN apk update && apk add --no-cache wget
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+
+COPY go.mod go.sum ./
+COPY containers/uasl_reservation/.air.toml .air.toml
+RUN go mod download
+COPY . .
+CMD ["air", "-c", ".air.toml"]
+

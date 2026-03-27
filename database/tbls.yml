@@ -4,8 +4,7 @@
 name: DBドキュメント
 
 # postgresへの接続情報
-# dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
-dsn: postgres://test-user:test-password@localhost:5432/postgres?sslmode=disable
+dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
 
 # ドキュメントの出力先ディレクトリを指定
 docPath: database/dbdoc

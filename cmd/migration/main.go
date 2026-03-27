@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"airway-reservation/cmd/migration/db"
+	"uasl-reservation/cmd/migration/db"
 )
 
 func main() {

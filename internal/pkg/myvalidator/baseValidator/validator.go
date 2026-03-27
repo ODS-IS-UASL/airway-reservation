@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"airway-reservation/internal/pkg/myerror"
-	"airway-reservation/internal/pkg/value"
+	"uasl-reservation/internal/pkg/myerror"
+	"uasl-reservation/internal/pkg/value"
 
 	"github.com/go-playground/validator"
 )
@@ -53,24 +53,24 @@ func datetimeValidation(fl validator.FieldLevel) bool {
 // nilと空文字以外の時にUUIDの形式をチェックする
 func updatePointerUUIDValidation(fl validator.FieldLevel) bool {
 	field := fl.Field()
-	// ポインタ型の判定
+
 	if field.Kind() == reflect.Ptr {
 		if field.IsNil() {
 			return true
 		}
-		// nil以外はポインタの中の値を取得
+
 		field = field.Elem()
 	}
-	// string型かどうかを確認
+
 	if field.Kind() != reflect.String {
 		return false
 	}
 	id := field.String()
-	// 空文字列の場合はバリデーション成功
+
 	if id == "" {
 		return true
 	}
-	// UUIDの形式をチェック
+
 	_, err := value.NewModelIDFromUUIDString(id)
 	return err == nil
 }

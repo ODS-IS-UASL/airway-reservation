@@ -1,622 +1,1945 @@
 openapi: 3.0.3
 info:
-  title: ドローン航路API（A-1-3）
-  version: 1.0.0
+  title: ドローン航路一括予約API
+  version: 1.0.10
+  description: |
+    # ドローン航路一括予約インターフェース仕様書
+    ### 変更履歴
+
+    | 版 | 日付 | 備考 |
+    |---------|------------|----------------------------|
+    | 1.0.10 | 2026-03-25 | 仮押さえ予約時の離着陸場の日時指定を任意に変更 |
+    | 1.0.9 | 2026-03-04 | DestinationReservationEntityのvehicles[]を削除 |
+    | 1.0.8 | 2026-03-03 | originReservationにreservationId（主航路の予約ID）を追加 |
+    | 1.0.7 | 2026-02-26 | 認証方式にBearerAuth追加、/availabilityレスポンスのresultをフラット化、 |
+    | 1.0.6 | 2026-02-20 | レスポンスexampleをper fieldに変更。/availabilityレスポンスにports,vehicles追加 |
+    | 1.0.5 | 2026-02-13 | VehicleInput/VehicleElementにaircraftInfo(Object)を追加。AircraftInfoスキーマを新設 |
+    | 1.0.4 | 2026-02-13 | 全レスポンスのペイロード構造をoriginReservation/destinationReservationsに再構成。OriginReservationEntity（reservationIdなし）とDestinationReservationEntity（reservationIdあり）を分離。estimatedAt廃止 |
+    | 1.0.3 | 2026-01-29 | OpenAPI仕様の表現整理  |
+    | 1.0.2 | 2026-01-28 | OpenAPI仕様の表現整理および例の修正 |
+    | 1.0.1 | 2026-01-26 | 予約レスポンスの uaslSections に子予約ID(reservationId)、航路ID(uaslId)、通過順(sequence)を追加 |
+    | 1.0.0 | 2025-12-23 | 初回コミット |
+
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  description:
 security:
   - ApiKeyAuth: []
-
+    BearerAuth: []
+servers:
+  - url: https://{baseUrl}/v1
+    variables:
+      baseUrl:
+        default: uasl.poc-pf.xxxxx.com
 paths:
-  /airwayReservations:
+  /uaslReservations:
     post:
       tags:
-        - 航路予約サービス
-      summary: 航路予約API
-      operationId: reserveAirway
-      description: >-
-        運航事業者が航路を予約するため、予約したい航路区画毎に利用したい日時を指定して航路予約を申請、予約結果を返却する。<br/>
-        航路予約情報は、航路区画IDおよびそれに紐づく予約時間範囲、予約した運航事業者IDと予約ID、予約ステータス、予約完了日時で構成される想定。<br/>
-        新規予約時は予約状態更新日時は空となる。<br/>
+        - ドローン航路一括予約サービス
+      summary: 航路一括予約を仮押さえする
+      operationId: uasl_reservations_post
+      description: 航路・機体・離着陸場をまとめて予約する
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReserveAirwayRequest'
+              $ref: "#/components/schemas/CreateUaslReservationsRequest"
+            examples:
+              withOptional:
+                summary: with optional fields
+                value:
+                  operatorId: 60c895e5-321a-fe8a-af39-f005f3206efb
+                  ignoreFlightPlanConflict: false
+                  vehicles:
+                    - vehicleId: ROUTEOPRID-VEHICLEID-101
+                      aircraftInfo:
+                        aircraftInfoId: 0
+                        registrationId: JU1234567890AB
+                        maker: DJI
+                        modelNumber: M30T
+                        name: DJI Matrice 30T
+                        type: マルチコプター
+                        length: 1.2
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T11:00:00Z
+                  ports:
+                    - portId: ROUTEOPRID-PORTMFRID-101
+                      usageType: 1
+                      startAt: 2025-12-12T09:50:00Z
+                      endAt: 2025-12-12T10:20:00Z
+                    - portId: ROUTEOPRID-PORTMFRID-102
+                      usageType: 2
+                      startAt: 2025-12-12T10:20:00Z
+                      endAt: 2025-12-12T11:00:00Z
+                  uaslSections:
+                    - uaslSectionId: 5a2f2b6a-410d-4d6e-a0b9-13cc2e0db2a5
+                      uaslId: 6b3c4d5e-2222-3333-4444-555566667777
+                      sequence: 1
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T11:00:00Z
+              minimal:
+                summary: minimal
+                value:
+                  operatorId: 60c895e5-321a-fe8a-af39-f005f3206efb
+                  uaslSections:
+                    - uaslSectionId: 5a2f2b6a-410d-4d6e-a0b9-13cc2e0db2a5
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T10:10:00Z
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AirwayReservationResponse'
-        '400':
+                $ref: "#/components/schemas/CreateUaslReservationsResponse"
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
-          description: Not Found
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict - 重複により予約失敗（空域・航路・機体・ポート）
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
+                $ref: "#/components/schemas/ConflictedResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500Response'
-  /operator/{operatorId}/airwayReservations:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uaslReservations/availability:
+    post:
+      tags:
+        - ドローン航路一括予約サービス
+      summary: 航路区画・機体・離着陸場予約の予約状況を取得する
+      operationId: uasl_reservations_availability_post
+      description: |
+        指定された航路区画・機体・離着陸場予約情報を返す。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvailabilityUaslReservationsRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UaslReservationAvailabilityResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uaslReservations/estimate:
+    post:
+      tags:
+        - ドローン航路一括予約サービス
+      summary: 航路利用料金の概算見積りを取得する
+      operationId: uasl_reservations_estimate_post
+      description: 航路・機体・離着陸場の料金概算を算出する
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUaslReservationsEstimateRequest"
+            examples:
+              withOptional:
+                summary: with optional fields
+                value:
+                  uaslSections:
+                    - uaslSectionId: 5a2f2b6a-410d-4d6e-a0b9-13cc2e0db2a5
+                      uaslId: 6b3c4d5e-2222-3333-4444-555566667777
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T11:00:00Z
+                  vehicles:
+                    - vehicleId: ROUTEOPRID-VEHICLEID-101
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T11:00:00Z
+                  ports:
+                    - portId: ROUTEOPRID-PORTMFRID-101
+                      startAt: 2025-12-12T09:50:00Z
+                      endAt: 2025-12-12T10:20:00Z
+                    - portId: ROUTEOPRID-PORTMFRID-102
+                      startAt: 2025-12-12T10:20:00Z
+                      endAt: 2025-12-12T11:00:00Z
+              minimal:
+                summary: minimal
+                value:
+                  uaslSections:
+                    - uaslSectionId: 5a2f2b6a-410d-4d6e-a0b9-13cc2e0db2a5
+                      startAt: 2025-12-12T10:00:00Z
+                      endAt: 2025-12-12T10:10:00Z
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUaslReservationsEstimateResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/uaslReservations:
     get:
       tags:
-        - 航路予約サービス
-      summary: 航路予約一覧取得API（運航事業者向け）
-      operationId: listAirwayReservationByOperator
-      description: >-
-        運航事業者が自身の航路予約一覧を確認するため、予約一覧を確認すると、要求した運航事業者の航路予約情報返却する。<br/>
-        航路予約情報は、航路区画IDおよびそれに紐づく予約時間範囲、予約した運航事業者IDと予約ID、予約ステータス、予約完了日時、そして予約状態更新日時で構成される想定。<br/>
-        予約終了時刻を過ぎたものはデフォルトでは返さない、返したい場合はフラグ制御してもいいが大量データの場合は厳しいので必要に応じて別APIとして切り出す。<br/>
+        - ドローン航路一括予約サービス
+      summary: 管理者として航路一括予約一覧を取得する
+      operationId: uasl_reservations_admin_get
+      description: 管理者向け一覧取得（ページング対応）。
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            default: 1
+          description: ページ番号
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUaslReservationResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /operator/{operatorId}/uaslReservations:
+    get:
+      tags:
+        - ドローン航路一括予約サービス
+      summary: 運航事業者IDで航路一括予約一覧を取得
+      operationId: uasl_reservations_operator_get
+      description: 運航事業者IDでフィルタした一覧取得（ページング対応）
       parameters:
         - name: operatorId
-          required: true
           in: path
+          required: true
           schema:
             type: string
-            format: uuid
-            minLength: 36
-            maxLength: 36
-            description: 運航事業者ID
-            example: '123e4567-e89b-12d3-a456-426614174000'
+          description: 運航事業者ID
         - name: page
-          required: false
           in: query
+          required: false
           schema:
             type: integer
+            format: int32
+            minimum: 1
             default: 1
-            maximum: 9999
-            description: ページ番号
+          description: ページ番号
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AirwayReservationsResponse'
-        '400':
+                $ref: "#/components/schemas/ListUaslReservationResponse"
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
-          description: Not Found
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500Response'
-  /admin/airwayReservations:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uaslReservations/{requestId}:
     get:
       tags:
-        - 航路予約サービス
-      summary: 航路予約一覧取得API（航路運営者向け）
-      operationId: listAirwayReservationByAdministrator
-      description: >-
-        航路運営者が自身の運営している航路予約一覧を確認するため、予約一覧を確認すると、要求した運営している航路の航路予約情報を返却する。<br/>
-        航路予約情報は、航路区画IDおよびそれに紐づく予約時間範囲、予約した運航事業者IDと予約ID、予約ステータス、予約完了日時、そして予約状態更新日時で構成される想定。<br/>
-        予約終了時刻を過ぎたものはデフォルトでは返さない、返したい場合はフラグ制御してもいいが大量データの場合は厳しいので必要に応じて別APIとして切り出す。<br/>
+        - ドローン航路一括予約サービス
+      summary: 航路一括予約の詳細を取得する
+      operationId: uasl_reservations_detail_get
+      description: |
+        航路 + 機体 + 離着陸場 予約詳細情報取得。
+        空域干渉情報を含む。
       parameters:
-        - name: page
-          required: false
-          in: query
-          schema:
-            type: integer
-            default: 1
-            maximum: 9999
-            description: ページ番号
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AirwayReservationsResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500Response'
-  /airwayReservations/{airwayReservationId}:
-    get:
-      tags:
-        - 航路予約サービス
-      summary: 航路予約詳細取得API
-      operationId: getAirwayReservation
-      description: >-
-        航路予約IDをキーに航路予約の詳細情報を取得する
-      parameters:
-        - name: airwayReservationId
-          required: true
+        - name: requestId
           in: path
+          required: true
           schema:
             type: string
             format: uuid
             minLength: 36
             maxLength: 36
-            description: 航路予約ID
-            example: '123e4567-e89b-12d3-a456-426614174000'
+          description: |
+            親予約ID（冪等キー）。
+            POST /uaslReservations のレスポンスで返却される requestId を指定する。
+            同一requestIdで複数回呼び出しても同じ結果を返す。
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AirwayReservationResponse'
-        '400':
-          description: Bad Request
+                $ref: "#/components/schemas/UaslReservationDetailResponse"
+        "403":
+          description: Forbidden - 予約が見つからない、またはアクセス権限がない
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
-          description: Not Found
+                $ref: "#/components/schemas/ForbiddenResponse"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500Response'
-  /airwayReservations/{airwayReservationId}/cancel:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uaslReservations/{requestId}/confirm:
     put:
       tags:
-        - 航路予約サービス
-      summary: 航路予約取消API（運航事業者向け）
-      operationId: cancelAirwayReservation
-      description: >-
-        運航事業者が自身が予約した航路予約をキャンセルするため、キャンセルしたい予約IDで航路予約取消要求をおこない、キャンセル結果を返却する。
+        - ドローン航路一括予約サービス
+      operationId: uasl_reservations_confirm_put
+      summary: 航路一括予約の仮押さえを確定する
       parameters:
-        - name: airwayReservationId
-          required: true
+        - name: requestId
           in: path
+          required: true
           schema:
             type: string
             format: uuid
             minLength: 36
             maxLength: 36
-            description: 航路予約ID
-            example: '123e4567-e89b-12d3-a456-426614174000'
+          description: |
+            親予約ID（冪等キー）。
+            POST /uaslReservations のレスポンスで返却される requestId を指定する。
+            同一requestIdで複数回呼び出しても同じ結果を返す。
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AirwayReservationCancellationResponse'
-        '400':
+                $ref: "#/components/schemas/ConfirmUaslReservationResponse"
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
+                $ref: "#/components/schemas/Error404Response"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500Response'
-  /admin/airwayReservations/{airwayReservationId}/rescind:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uaslReservations/{requestId}/cancel:
     put:
       tags:
-        - 航路予約サービス
-      summary: 航路予約撤回API（航路運営者向け）
-      operationId: rescindAirwayReservation
-      description: >-
-        航路運営者が航路事業者が予約した航路予約を撤回するため、撤回したい予約IDで航路予約撤回要求をおこない、撤回結果を返却する。
+        - ドローン航路一括予約サービス
+      summary: 航路一括予約を取り消す
+      operationId: uasl_reservations_cancel_put
+      description: 航路・機体・離着陸場を含む予約を取り消す
       parameters:
-        - name: airwayReservationId
-          required: true
+        - name: requestId
           in: path
+          required: true
           schema:
             type: string
             format: uuid
             minLength: 36
             maxLength: 36
-            description: 航路予約ID
-            example: '123e4567-e89b-12d3-a456-426614174000'
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AirwayReservationRescissionResponse'
-        '400':
+                $ref: "#/components/schemas/CancelUaslReservationResponse"
+        "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error400Response'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error404Response'
-        '500':
-          description: Server Error
+                $ref: "#/components/schemas/Error404Response"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500Response'
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/uaslReservations/{requestId}/rescind:
+    put:
+      tags:
+        - ドローン航路一括予約サービス
+      summary: 管理者が航路一括予約を撤回する
+      operationId: uasl_reservations_rescind_put
+      description: 航路 + 機体 + 離着陸場 予約情報撤回
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            minLength: 36
+            maxLength: 36
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescindUaslReservationResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error404Response"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     ApiKeyAuth:
-      description: A-1-3のAPI Gatewayにて生成されたキー。MVP3ではデプロイ先の共通API Gatewayで認証するため削除予定。
+      description: 航路予約サービスのAPI Gatewayにて生成されたキー
       type: apiKey
-      name: Authorization
+      name: API-Key
       in: header
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
-    ReserveAirwayRequest:
+    UaslSectionInput:
       type: object
       required:
-        - operatorId
-        - airwaySections
+        - uaslId
+        - uaslSectionId
         - startAt
         - endAt
+      description: 航路区画の予約入力情報
       properties:
-        operatorId:
+        uaslId:
+          type: string
+          description: 航路ID
+          example: "7c1d2e3f-4a5b-4c6d-8e7f-1a2b3c4d5e6f"
+        uaslSectionId:
+          type: string
+          description: 航路区画ID
+          example: "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+        sequence:
+          type: integer
+          format: int32
+          description: 航路区画の予約順序
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:00:00Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:10:00Z"
+
+    UaslSectionAvailabilityInput:
+      type: object
+      required:
+        - uaslId
+        - uaslSectionId
+      description: 予約状況照会の航路区画入力情報
+      properties:
+        uaslId:
+          type: string
+          description: 航路ID
+          example: "7c1d2e3f-4a5b-4c6d-8e7f-1a2b3c4d5e6f"
+        uaslSectionId:
+          type: string
+          description: 航路区画ID
+          example: "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+
+    UaslSections:
+      type: object
+      required:
+        - uaslSectionId
+        - startAt
+        - endAt
+        - amount
+      description: 航路区画の予約内容
+      properties:
+        uaslSectionId:
+          type: string
+          description: 航路区画ID
+          example: "b819090d-679e-458c-ac96-903866cdb700"
+        sequence:
+          type: integer
+          format: int32
+          description: 航路区画の予約順序
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンはZ（UTC）で指定してください。
+          example: "2025-12-12T10:00:00Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンはZ（UTC）で指定してください。
+          example: "2025-12-12T10:10:00Z"
+        amount:
+          type: integer
+          format: int32
+          description: 金額
+          example: 500
+
+    UaslSectionReservationItem:
+      type: object
+      required:
+        - requestId
+        - operatorId
+        - flightPurpose
+        - startAt
+        - endAt
+      description: 航路区画の既存予約情報
+      properties:
+        requestId:
           type: string
           format: uuid
           minLength: 36
           maxLength: 36
+          description: |
+            親予約ID（冪等キー）
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+        operatorId:
+          type: string
           description: 運航事業者ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        airwaySections:
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:00:00Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:10:00Z"
+
+    VehicleInput:
+      type: object
+      required:
+        - aircraftInfo
+        - startAt
+        - endAt
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+          example: "ROUTEOPRID-VEHICLEID-101"
+        aircraftInfo:
+          $ref: "#/components/schemas/AircraftInfo"
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            指定がない場合は該当するuaslSectionsの範囲を採用（サーバ側で補完）
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:00:00Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            指定がない場合は該当するuaslSectionsの範囲を採用（サーバ側で補完）
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "2025-12-12T10:10:00Z"
+
+    VehicleAvailabilityInput:
+      type: object
+      required:
+        - vehicleId
+      description: 予約状況照会の機体入力情報
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+          example: "ROUTEOPRID-VEHICLEID-101"
+
+    VehicleElement:
+      type: object
+      required:
+        - vehicleId
+        - reservationId
+        - aircraftInfo
+        - startAt
+        - endAt
+        - amount
+      description: 機体予約要素
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+          example: "ROUTEOPRID-VEHICLEID-101"
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（requestId）に紐づく、機体の子予約ID。
+          example: "b819090d-679e-458c-ac96-903866cdb700"
+        aircraftInfo:
+          $ref: "#/components/schemas/AircraftInfo"
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 300
+
+    VehicleTryHoldElement:
+      type: object
+      required:
+        - vehicleId
+        - aircraftInfo
+        - startAt
+        - endAt
+        - amount
+      description: 機体予約要素
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+          example: "ROUTEOPRID-VEHICLEID-101"
+        aircraftInfo:
+          $ref: "#/components/schemas/AircraftInfo"
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 300
+
+    VehicleListElement:
+      type: object
+      required:
+        - vehicleId
+      description: 一覧取得用機体要素
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 親予約ID（requestId）に紐づく、機体の子予約ID。
+        name:
+          type: string
+          description: 機体の表示名またはモデル名
+          example: "DJI-M30"
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 300
+
+    VehicleReservationItem:
+      type: object
+      description: 機体予約情報
+      required:
+        - reservationId
+        - requestId
+        - aircraftInfo
+        - startAt
+        - endAt
+      properties:
+        vehicleId:
+          type: string
+          description: 機体ID
+          example: "ROUTEOPRID-VEHICLEID-101"
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（requestId）に紐づく、機体の子予約ID。
+          example: "b819090d-679e-458c-ac96-903866cdb700"
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 親予約ID（冪等キー）。離着陸場単体予約の場合は空
+          example: b819090d-679e-458c-ac96-903866cdb700
+        aircraftInfo:
+          $ref: "#/components/schemas/AircraftInfo"
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+
+    PortInput:
+      type: object
+      required:
+        - portId
+        - usageType
+      description: 離着陸場の予約入力情報
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+        usageType:
+          type: integer
+          format: int32
+          description: 使用種別（1=離陸, 2=着陸, 3=その他）
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+            未指定の場合、
+            ・使用種別が1=離陸の場合には予約航路の開始日時（uaslSectionのstartAt）を自動設定
+            ・使用種別が2=着陸の場合には予約航路の終了日時（uaslSectionのendAt）の15分前を自動設定
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+            未指定の場合、
+            ・使用種別が1=離陸の場合には予約航路の開始日時（uaslSectionのstartAt）の15分後を自動設定
+            ・使用種別が2=着陸の場合には予約航路の終了日時（uaslSectionのendAt）を自動設定
+          example: "1985-04-12T23:20:50.52Z"
+
+    PortAvailabilityInput:
+      type: object
+      required:
+        - portId
+      description: 予約状況照会の離着陸場入力情報
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+          example: "ROUTEOPRID-PORTMFRID-101"
+
+    PortElement:
+      type: object
+      required:
+        - portId
+        - reservationId
+        - usageType
+        - startAt
+        - endAt
+        - name
+        - amount
+      description: 離着陸場予約要素
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+          example: "ROUTEOPRID-PORTMFRID-101"
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（requestId）に紐づく、離着陸場の子予約ID。
+          example: "b819090d-679e-458c-ac96-903866cdb700"
+        usageType:
+          type: integer
+          format: int32
+          description: 使用種別（1=離陸, 2=着陸, 3=その他）
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        name:
+          type: string
+          description: 離着陸場の表示名
+          example: "Port-A"
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 400
+
+    PortTryHoldElement:
+      type: object
+      required:
+        - portId
+        - usageType
+        - startAt
+        - endAt
+        - name
+        - amount
+      description: 仮押さえ離着陸場要素
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+        usageType:
+          type: integer
+          format: int32
+          description: 使用種別（1=離陸, 2=着陸, 3=その他）
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        name:
+          type: string
+          description: 離着陸場の表示名
+          example: "Port-A"
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 400
+
+    PortListElement:
+      type: object
+      required:
+        - portId
+      description: 一覧取得用離着陸場要素
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 親予約ID（requestId）に紐づく、離着陸場の子予約ID。
+        name:
+          type: string
+          description: 離着陸場の表示名
+          example: "Port-A"
+        usageType:
+          type: integer
+          format: int32
+          description: 使用種別（1=離陸, 2=着陸, 3=その他）
+          example: 1
+        amount:
+          type: integer
+          format: int32
+          description: 見積もり金額（税込）
+          example: 300
+
+    PortReservationItem:
+      type: object
+      description: 離着陸場予約情報
+      properties:
+        portId:
+          type: string
+          description: 離着陸場ID
+          example: "ROUTEOPRID-PORTMFRID-101"
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（requestId）に紐づく、離着陸場の子予約ID。
+          example: "b819090d-679e-458c-ac96-903866cdb700"
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 親予約ID（冪等キー）。離着陸場単体予約の場合は空
+          example: b819090d-679e-458c-ac96-903866cdb700
+        usageType:
+          type: integer
+          format: int32
+          description: 使用種別（1=離陸, 2=着陸, 3=その他）
+          example: 1
+        startAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        endAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC3339形式の日時文字列。タイムゾーンは Z（UTC）で指定してください。
+          example: "1985-04-12T23:20:50.52Z"
+        name:
+          type: string
+          description: 離着陸場の表示名
+          example: "Port-A"
+
+    AircraftInfo:
+      type: object
+      required:
+        - aircraftInfoId
+        - maker
+        - modelNumber
+        - name
+        - type
+        - length
+      description: 機体情報
+      properties:
+        aircraftInfoId:
+          type: integer
+          format: int32
+          description: 機体情報ID
+          example: 0
+        registrationId:
+          type: string
+          description: リモートID（登録記号）。省略可。
+          example: "JU1234567890AB"
+        maker:
+          type: string
+          description: 製造者名
+          example: "DJI"
+        modelNumber:
+          type: string
+          description: 機体型式
+          example: "M30T"
+        name:
+          type: string
+          description: 機体名称
+          example: "DJI Matrice 30T"
+        type:
+          type: string
+          description: 機体種別
+          example: "マルチコプター"
+        length:
+          type: number
+          description: 機体全長
+          example: 1.2
+
+    ConformityAssessmentResult:
+      type: object
+      required:
+        - uaslSectionId
+        - aircraftInfo
+        - evaluationResults
+        - reasons
+        - type
+      description: 適合性評価実行結果
+      properties:
+        uaslSectionId:
+          type: string
+          description: 航路区画ID
+          example: "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+        aircraftInfo:
+          type: object
+          description: 機体情報
+          $ref: "#/components/schemas/AircraftInfo"
+        evaluationResults:
+          type: boolean
+          description: |
+            適合性評価結果
+            true : 適合性評価結果OK
+            false: 適合性評価結果NG
+          example: false
+        type:
+          type: string
+          description: |
+            適合性評価結果がNGの場合の種別
+            "weather": 天候・風速条件によるNG
+            "event": 規制／イベントによるNG
+            "railway": 鉄道運行によるNG
+            "intrusion": 第三者立入によるNG
+            ※evaluationResultsがfalseの場合に参照
+          enum: [
+            "weather",
+            "event",
+            "railway",
+            "intrusion",
+            "null"
+          ]
+          example: weather
+        reasons:
+          type: string
+          description: |
+            適合性評価結果がNGの場合の詳細
+            ※evaluationResultsがfalseの場合に参照
+          example: 風速条件範囲内判定エラー
+
+    CreateUaslReservationsRequest:
+      type: object
+      required:
+        - operatorId
+        - uaslSections
+      description: 仮押さえ予約APIのリクエストボディ
+      properties:
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        ignoreFlightPlanConflict:
+          type: boolean
+          description: |
+            true の場合、DIPS 飛行計画との空域干渉を無視して予約を実行する。
+            false（デフォルト）の場合、空域干渉が検出されると予約は実行されず、エラーメッセージのみを返す。
+          default: false
+        uaslSections:
           type: array
           minItems: 1
           maxItems: 99
-          description: 航路区画配列
+          description: 予約しようとしている航路区画の一覧（1件以上必須）
           items:
-            type: object
-            required:
-              - airwaySectionId
-              - startAt
-              - endAt
-            properties:
-              airwaySectionId:
-                type: string
-                format: uuid
-                minLength: 36
-                maxLength: 36
-                description: 航路区画ID
-                example: '123e4567-e89b-12d3-a456-426614174000'
-              startAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約開始日時
-                example: '2025-01-13T09:00:00Z'
-              endAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約終了日時
-                example: '2025-01-13T16:00:00Z'
-    AirwayReservationResponse:
+            $ref: "#/components/schemas/UaslSectionInput"
+        vehicles:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: |
+            予約しようとしている機体の一覧
+            機体の予約入力情報。シェアリング機体予約の場合はvehicleId必須。
+            持ち込み機体の場合はaircraftInfoで代替するためvehicleId不要。
+          items:
+            $ref: "#/components/schemas/VehicleInput"
+        ports:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約しようとしている離着陸場の一覧
+          items:
+            $ref: "#/components/schemas/PortInput"
+    AvailabilityUaslReservationsRequest:
       type: object
       required:
-        - airwayReservationId
+        - uaslSections
+      description: 予約状況照会APIのリクエストボディ
+      properties:
+        uaslSections:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい航路区画
+          items:
+            $ref: "#/components/schemas/UaslSectionAvailabilityInput"
+        vehicles:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい機体
+          items:
+            $ref: "#/components/schemas/VehicleAvailabilityInput"
+        ports:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい離着陸場
+          items:
+            $ref: "#/components/schemas/PortAvailabilityInput"
+    CreateUaslReservationsEstimateRequest:
+      type: object
+      required:
+        - uaslSections
+      description: 料金概算見積もりAPIのリクエストボディ
+      properties:
+        uaslSections:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい航路区画
+          items:
+            $ref: "#/components/schemas/UaslSectionInput"
+        vehicles:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい機体
+          items:
+            $ref: "#/components/schemas/VehicleInput"
+        ports:
+          type: array
+          minItems: 1
+          maxItems: 99
+          description: 予約情報を確認したい離着陸場
+          items:
+            $ref: "#/components/schemas/PortInput"
+
+    CreateUaslReservationsResponse:
+      type: object
+      required:
+        - requestId
         - operatorId
-        - airwaySections
-        - startAt
-        - endAt
-        - reservedAt
+        - flightPurpose
+        - status
         - updatedAt
+        - originReservation
+        - destinationReservations
+        - totalAmount
+      description: 仮押さえ予約APIレスポンス
       properties:
-        airwayReservationId:
+        requestId:
           type: string
           format: uuid
           minLength: 36
           maxLength: 36
-          description: 航路予約ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
+          description: |
+            親予約ID（冪等キー）
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
         operatorId:
           type: string
-          format: uuid
-          minLength: 36
-          maxLength: 36
           description: 運航事業者ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        airwaySections:
-          type: array
-          minItems: 1
-          maxItems: 99
-          description: 航路区画予約情報
-          items:
-            type: object
-            required:
-              - airwaySectionId
-              - startAt
-              - endAt
-            properties:
-              airwaySectionId:
-                type: string
-                format: uuid
-                minLength: 36
-                maxLength: 36
-                description: 航路区画ID
-                example: '123e4567-e89b-12d3-a456-426614174000'
-              startAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約開始日時
-                example: '2025-01-13T09:00:00Z'
-              endAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約終了日時
-                example: '2025-01-13T16:00:00Z'
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
         status:
           type: string
           enum:
-            - 'RESERVED'
-            - 'CANCELED'
-            - 'RESCINDED'
+            - "PENDING"
+            - "RESERVED"
+            - "CANCELED"
+            - "RESCINDED"
           description: 予約ステータス
-          example: 'RESERVED'
-        reservedAt:
+          example: PENDING
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 1500
+        estimatedAt:
           type: string
           format: date-time
-          description: 予約完了日時
-          example: '2024-12-13T18:53:38Z'
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
         updatedAt:
           type: string
           format: date-time
-          description: 予約状態更新日時（登録時も更新）
-          example: '2024-12-13T18:53:38Z'
-    AirwayReservationsResponse:
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationTryHoldEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationTryHoldEntity"
+
+    CreateUaslReservationsEstimateResponse:
       type: object
+      required:
+        - estimatedAt
+        - totalAmount
+      description: 料金概算見積もりAPIのレスポンス
+      properties:
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2025-12-12T10:00:00Z"
+        totalAmount:
+          type: integer
+          format: int32
+          description: 見積もり合計金額（税込）
+          example: 1500
+    UaslReservationListItem:
+      type: object
+      description: 予約一覧の各要素を示す。
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（冪等キー）
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
+        status:
+          type: string
+          description: "予約ステータス（例: RESERVED / CANCELED / RESCINDED）"
+          example: RESERVED
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 1500
+        reservedAt:
+          type: string
+          format: date-time
+          description: 予約確定日時（確定していない場合は空）
+          example: "2026-03-01T12:05:00Z"
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationEntity"
+
+    ListUaslReservationResponse:
+      type: object
+      required:
+        - result
+        - currentPage
+        - lastPage
+        - perPage
+        - total
+      description: 予約一覧取得APIのレスポンス
       properties:
         result:
           type: array
           items:
-            $ref: '#/components/schemas/AirwayReservationResponse'
-        total:
-          type: integer
-          default: 1
-          maximum: 9999
-          description: 総項目数
+            $ref: "#/components/schemas/UaslReservationListItem"
         currentPage:
           type: integer
-          default: 1
-          maximum: 9999
-          description: 現在ページ番号
+          format: int32
+          minimum: 1
+          example: 1
         lastPage:
           type: integer
-          default: 1
-          maximum: 9999
-          description: 最終ページ番号
+          format: int32
+          minimum: 1
+          example: 1
         perPage:
           type: integer
-          default: 20
-          maximum: 999
-          description: ページ当たり項目数
+          format: int32
+          minimum: 1
+          maximum: 100
+          example: 10
+        total:
+          type: integer
+          format: int32
+          minimum: 0
+          example: 2
+
+    UaslReservationDetailResponse:
+      type: object
+      required:
+        - requestId
+      description: 詳細取得レスポンス
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（冪等キー）
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: 商業飛行
+        status:
+          type: string
+          description: "予約ステータス（PENDING: 仮押さえ予約 / RESERVED: 予約済み / CANCELED: キャンセル済み / RESCINDED: 撤回済み）"
+          enum:
+            - PENDING
+            - RESERVED
+            - CANCELED
+            - RESCINDED
+          example: RESERVED
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 1500
+        reservedAt:
+          type: string
+          format: date-time
+          description: 予約確定日時（確定していない場合は空）
+          example: "2026-03-01T12:05:00Z"
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationEntity"
+
+    CancelUaslReservationResponse:
+      type: object
+      required:
+        - requestId
+      description: |
+        取消時のレスポンス。
+        機体・離着陸場の予約情報についてはキャンセル直前の予約情報を返す。
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（冪等キー）
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
+        status:
+          type: string
+          description: "予約ステータス（PENDING: 仮押さえ予約 / RESERVED: 予約済み / CANCELED: キャンセル済み / RESCINDED: 撤回済み）"
+          enum:
+            - PENDING
+            - RESERVED
+            - CANCELED
+            - RESCINDED
+          example: CANCELED
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 1500
+        reservedAt:
+          type: string
+          format: date-time
+          description: 予約確定日時（確定していない場合は空）
+          example: "2026-03-01T12:05:00Z"
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationEntity"
+
+    RescindUaslReservationResponse:
+      type: object
+      required:
+        - requestId
+      description: |
+        管理者による予約撤回時のレスポンス。
+        機体・離着陸場の予約情報については撤回直前の予約情報を返す。
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（冪等キー）。
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
+        status:
+          type: string
+          description: "予約ステータス（PENDING: 仮押さえ予約 / RESERVED: 予約済み / CANCELED: キャンセル済み / RESCINDED: 撤回済み）"
+          enum:
+            - PENDING
+            - RESERVED
+            - CANCELED
+            - RESCINDED
+          example: RESCINDED
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 1500
+        reservedAt:
+          type: string
+          format: date-time
+          description: 予約確定日時（確定していない場合は空）
+          example: "2026-03-01T12:05:00Z"
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationEntity"
+
+    ConfirmUaslReservationResponse:
+      type: object
+      required:
+        - requestId
+        - operatorId
+        - flightPurpose
+        - status
+        - totalAmount
+        - reservedAt
+        - estimatedAt
+        - updatedAt
+        - originReservation
+        - destinationReservations
+      description: 予約確定後のレスポンス
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: |
+            親予約ID（冪等キー）。
+            本API呼び出しを一意に識別するためのIDで、confirm/detailなどの後続API呼び出し時に指定する。
+          example: b819090d-679e-458c-ac96-903866cdb700
+        operatorId:
+          type: string
+          description: 運航事業者ID
+          example: 60c895e5-321a-fe8a-af39-f005f3206efb
+        flightPurpose:
+          type: string
+          description: 飛行目的
+          example: "ドローン鉄橋点検"
+        status:
+          type: string
+          description: "予約ステータス（PENDING: 仮押さえ予約 / RESERVED: 予約済み / CANCELED: キャンセル済み / RESCINDED: 撤回済み）"
+          enum:
+            - PENDING
+            - RESERVED
+            - CANCELED
+            - RESCINDED
+          example: RESERVED
+        totalAmount:
+          type: integer
+          format: int32
+          description: 合計金額（税込）
+          example: 2200
+        reservedAt:
+          type: string
+          format: date-time
+          description: 予約確定日時（確定していない場合は空）
+          example: "2026-03-01T12:05:00Z"
+        estimatedAt:
+          type: string
+          format: date-time
+          description: 見積もり日時
+          example: "2026-03-01T12:05:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2026-03-01T12:05:00Z"
+        originReservation:
+          $ref: "#/components/schemas/OriginReservationEntity"
+        destinationReservations:
+          type: array
+          description: 相互乗り入れ先の航路予約情報（単一航路の場合は空配列）
+          items:
+            $ref: "#/components/schemas/DestinationReservationEntity"
+
+    OriginReservationEntity:
+      type: object
+      required:
+        - reservationId
+        - uaslId
+        - administratorId
+        - subTotalAmount
+        - uaslSections
+        - ports
+        - vehicles
+        - conflictedFlightPlanIds
+        - conformityAssessmentResults
+      description: 主航路（origin）の予約情報。
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 航路予約ID（主航路の予約サービスが発行する予約ID）
+          example: "a1b2c3d4-1234-5678-9abc-def012345678"
+        uaslId:
+          type: string
+          description: 当該予約が属する航路のID
+          example: "7c1d2e3f-4a5b-4c6d-8e7f-1a2b3c4d5e6f"
+        administratorId:
+          type: string
+          description: 当該予約が属する航路の運営者ID
+          example: "a1b2c3d4-0000-1111-2222-333344445555"
+        subTotalAmount:
+          type: integer
+          format: int32
+          description: 当該航路の利用料金小計（税込）
+          example: 1100
+        uaslSections:
+          type: array
+          description: 航路区画毎の予約内容
+          items:
+            $ref: "#/components/schemas/UaslSections"
+        ports:
+          type: array
+          description: 離発着場予約情報
+          items:
+            $ref: "#/components/schemas/PortElement"
+        vehicles:
+          type: array
+          description: 機体予約情報
+          items:
+            $ref: "#/components/schemas/VehicleElement"
+        conflictedFlightPlanIds:
+          type: array
+          description: 空域干渉している飛行計画IDリスト（空配列の場合は干渉なし）
+          items:
+            type: string
+          example: []
+        conformityAssessmentResults:
+          type: array
+          description: 適合性評価結果リスト（航路区画ごとの評価結果）
+          items:
+            $ref: "#/components/schemas/ConformityAssessmentResult"
+
+    DestinationReservationEntity:
+      type: object
+      required:
+        - reservationId
+        - uaslId
+        - administratorId
+        - subTotalAmount
+        - uaslSections
+        - ports
+        - conflictedFlightPlanIds
+        - conformityAssessmentResults
+      description: 乗り入れ先航路（destination）の予約情報
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 航路予約ID（乗り入れ先航路の予約サービスが発行する予約ID）
+          example: "d4478f3e-5566-7788-9900-aabbccddeeff"
+        uaslId:
+          type: string
+          description: 当該予約が属する航路のID
+          example: "6b3c4d5e-2222-3333-4444-555566667777"
+        administratorId:
+          type: string
+          description: 当該予約が属する航路の運営者ID
+          example: "b2c3d4e5-1111-2222-3333-444455556666"
+        subTotalAmount:
+          type: integer
+          format: int32
+          description: 当該航路の利用料金小計（税込）
+          example: 1100
+        uaslSections:
+          type: array
+          description: 航路区画毎の予約内容
+          items:
+            $ref: "#/components/schemas/UaslSections"
+        ports:
+          type: array
+          description: 離発着場予約情報
+          items:
+            $ref: "#/components/schemas/PortElement"
+        conflictedFlightPlanIds:
+          type: array
+          description: 空域干渉している飛行計画IDリスト（空配列の場合は干渉なし）
+          items:
+            type: string
+          example: []
+        conformityAssessmentResults:
+          type: array
+          description: 適合性評価結果リスト（航路区画ごとの評価結果）
+          items:
+            $ref: "#/components/schemas/ConformityAssessmentResult"
+
+    OriginReservationTryHoldEntity:
+      type: object
+      required:
+        - reservationId
+        - uaslId
+        - administratorId
+        - subTotalAmount
+        - uaslSections
+        - ports
+        - vehicles
+        - conflictedFlightPlanIds
+        - conformityAssessmentResults
+      description: 仮押さえ時の主航路（origin）予約情報。
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 航路予約ID（主航路の予約サービスが発行する予約ID）
+          example: "a1b2c3d4-1234-5678-9abc-def012345678"
+        uaslId:
+          type: string
+          description: 当該予約が属する航路のID
+          example: "7c1d2e3f-4a5b-4c6d-8e7f-1a2b3c4d5e6f"
+        administratorId:
+          type: string
+          description: 当該予約が属する航路の運営者ID
+          example: "a1b2c3d4-0000-1111-2222-333344445555"
+        subTotalAmount:
+          type: integer
+          format: int32
+          description: 当該航路の利用料金小計（税込）
+          example: 1100
+        uaslSections:
+          type: array
+          description: 航路区画毎の予約内容
+          items:
+            $ref: "#/components/schemas/UaslSections"
+        ports:
+          type: array
+          description: 離発着場予約情報
+          items:
+            $ref: "#/components/schemas/PortTryHoldElement"
+        vehicles:
+          type: array
+          description: 機体予約情報
+          items:
+            $ref: "#/components/schemas/VehicleTryHoldElement"
+        conflictedFlightPlanIds:
+          type: array
+          description: 空域干渉している飛行計画IDリスト（空配列の場合は干渉なし）
+          items:
+            type: string
+          example: []
+        conformityAssessmentResults:
+          type: array
+          description: 適合性評価結果リスト（航路区画ごとの評価結果）
+          items:
+            $ref: "#/components/schemas/ConformityAssessmentResult"
+
+    DestinationReservationTryHoldEntity:
+      type: object
+      required:
+        - reservationId
+        - uaslId
+        - administratorId
+        - subTotalAmount
+        - uaslSections
+        - ports
+        - conflictedFlightPlanIds
+        - conformityAssessmentResults
+      description: 仮押さえ時の乗り入れ先航路（destination）予約情報
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+          minLength: 36
+          maxLength: 36
+          description: 航路予約ID（乗り入れ先航路の予約サービスが発行する予約ID）
+          example: "d4478f3e-5566-7788-9900-aabbccddeeff"
+        uaslId:
+          type: string
+          description: 当該予約が属する航路のID
+          example: "6b3c4d5e-2222-3333-4444-555566667777"
+        administratorId:
+          type: string
+          description: 当該予約が属する航路の運営者ID
+          example: "b2c3d4e5-1111-2222-3333-444455556666"
+        subTotalAmount:
+          type: integer
+          format: int32
+          description: 当該航路の利用料金小計（税込）
+          example: 1100
+        uaslSections:
+          type: array
+          description: 航路区画毎の予約内容
+          items:
+            $ref: "#/components/schemas/UaslSections"
+        ports:
+          type: array
+          description: 離発着場予約情報
+          items:
+            $ref: "#/components/schemas/PortTryHoldElement"
+        conflictedFlightPlanIds:
+          type: array
+          description: 空域干渉している飛行計画IDリスト（空配列の場合は干渉なし）
+          items:
+            type: string
+          example: []
+        conformityAssessmentResults:
+          type: array
+          description: 適合性評価結果リスト（航路区画ごとの評価結果）
+          items:
+            $ref: "#/components/schemas/ConformityAssessmentResult"
+
+    UaslReservationAvailabilityItem:
+      type: object
+      description: |
+        当該航路区画・機体・離着陸場に対して「すでに予約されている」既存の予約情報の1件を示す。
+        キャンセル済みや撤回済みの予約情報は含まれない。
+      properties:
+        uaslSections:
+          type: array
+          description: 航路区画情報
+          minItems: 1
+          maxItems: 99
+          items:
+            $ref: "#/components/schemas/UaslSectionReservationItem"
+        ports:
+          type: array
+          description: 離着陸場情報
+          minItems: 1
+          maxItems: 99
+          items:
+            $ref: "#/components/schemas/PortReservationItem"
+        vehicles:
+          type: array
+          description: 機体情報
+          minItems: 1
+          maxItems: 99
+          items:
+            $ref: "#/components/schemas/VehicleReservationItem"
+
+    UaslReservationAvailabilityResponse:
+      type: object
       required:
         - result
-        - total
-        - currentPage
-        - lastPage
-        - perPage
-    AirwayReservationCancellationResponse:
+      properties:
+        result:
+          nullable: false
+          $ref: "#/components/schemas/UaslReservationAvailabilityItem"
+
+    ConflictedResponse:
       type: object
       required:
-        - airwayReservationId
-        - operatorId
-        - airwaySections
-        - startAt
-        - endAt
-        - reservedAt
-        - updatedAt
+        - message
+        - conflicts
+      description: 競合エラーレスポンス
       properties:
-        airwayReservationId:
+        requestId:
           type: string
-          format: uuid
-          minLength: 36
-          maxLength: 36
-          description: 航路予約ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        operatorId:
+          example: uuid
+        errorCode:
           type: string
-          format: uuid
-          minLength: 36
-          maxLength: 36
-          description: 運航事業者ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        airwaySections:
-          type: array
-          minItems: 1
-          maxItems: 99
-          description: 航路区画予約情報
-          items:
-            type: object
-            required:
-              - airwaySectionId
-              - startAt
-              - endAt
-            properties:
-              airwaySectionId:
-                type: string
-                format: uuid
-                minLength: 36
-                maxLength: 36
-                description: 航路区画ID
-                example: '123e4567-e89b-12d3-a456-426614174000'
-              startAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約開始日時
-                example: '2025-01-13T09:00:00Z'
-              endAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約終了日時
-                example: '2025-01-13T16:00:00Z'
-        status:
+          example: AIRSPACE_CONFLICT
+        message:
           type: string
-          enum:
-            - 'RESERVED'
-            - 'CANCELED'
-            - 'RESCINDED'
-          description: 予約ステータス
-          example: 'CANCELED'
-        reservedAt:
-          type: string
-          format: date-time
-          description: 予約完了日時
-          example: '2024-12-13T18:53:38Z'
-        updatedAt:
-          type: string
-          format: date-time
-          description: 予約状態更新日時
-          example: '2024-12-13T18:53:38Z'
-    AirwayReservationRescissionResponse:
-      type: object
-      required:
-        - airwayReservationId
-        - operatorId
-        - airwaySections
-        - startAt
-        - endAt
-        - reservedAt
-        - updatedAt
-      properties:
-        airwayReservationId:
-          type: string
-          format: uuid
-          minLength: 36
-          maxLength: 36
-          description: 航路予約ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        operatorId:
-          type: string
-          format: uuid
-          minLength: 36
-          maxLength: 36
-          description: 運航事業者ID
-          example: '123e4567-e89b-12d3-a456-426614174000'
-        airwaySections:
-          type: array
-          minItems: 1
-          maxItems: 99
-          description: 航路区画予約情報
-          items:
-            type: object
-            required:
-              - airwaySectionId
-              - startAt
-              - endAt
-            properties:
-              airwaySectionId:
-                type: string
-                format: uuid
-                minLength: 36
-                maxLength: 36
-                description: 航路区画ID
-                example: '123e4567-e89b-12d3-a456-426614174000'
-              startAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約開始日時
-                example: '2025-01-13T09:00:00Z'
-              endAt:
-                type: string
-                format: date-time
-                description: 航路区画毎の予約終了日時
-                example: '2025-01-13T16:00:00Z'
-        status:
-          type: string
-          enum:
-            - 'RESERVED'
-            - 'CANCELED'
-            - 'RESCINDED'
-          description: 予約ステータス
-          example: 'RESCINDED'
-        reservedAt:
-          type: string
-          format: date-time
-          description: 予約完了日時
-          example: '2024-12-13T18:53:38Z'
-        updatedAt:
-          type: string
-          format: date-time
-          description: 予約状態更新日時
-          example: '2024-12-13T18:53:38Z'
-    Error400Response:
-      type: object
-      required:
-        - error
-      properties:
-        error:
+          example: Reservation not executed due to airspace conflict
+        conflicts:
           type: object
-          required:
-            - message
           properties:
-            message:
+            type:
               type: string
-              example: 'BAD_REQUEST'
+              example: FLIGHTPLAN
+            items:
+              type: array
+              description: 空域干渉が検出されたIDの一覧（空配列の場合は干渉なし）
+              minItems: 0
+              maxItems: 999
+              items:
+                type: object
+                additionalProperties:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+              example:
+                - requestId: res-123
+                - uaslId: uasl-123
+                - administratorId: admin-123
+                - reservationId: res-456
+                - resourceId: port-001
+                - flightPlanIds:
+                    - 2d3a6a8e-8b8d-4d5a-a8a8-9bdc4e9a0c1f
+                    - 3e4b7b9f-9c9e-5e6b-b9b9-0cde5f0ad2f0
+    ForbiddenResponse:
+      type: object
+      required:
+        - message
+      description: アクセス禁止エラーレスポンス
+      properties:
+        message:
+          type: string
+          example: Forbidden
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      description: エラーレスポンス
+      properties:
+        message:
+          type: string
+          description: エラーメッセージ
+          example: "Bad Request"
     Error404Response:
       type: object
       required:
         - error
+      description: 404エラーレスポンス
       properties:
         error:
           type: object
-          required:
-            - message
           properties:
             message:
               type: string
-              example: 'NOT_FOUND'
-    Error500Response:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: object
-          required:
-            - message
-          properties:
-            message:
-              type: string
-              example: 'SERVER_ERROR'
+              example: "NOT_FOUND"

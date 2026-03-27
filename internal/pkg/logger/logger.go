@@ -15,21 +15,35 @@ import (
 var (
 	once          sync.Once
 	zapLogger     *zap.Logger
-	logLevel      zapcore.Level // Default is InfoLevel
+	logLevel      zapcore.Level
 	callerEncoder zapcore.CallerEncoder
 	consoleFields []string
 )
 
-// Initialize the Logger.
+func LogDebug(format string, args ...interface{}) {
+	log.Printf("[DEBUG] "+format, args...)
+}
+
+func LogInfo(format string, args ...interface{}) {
+	log.Printf("[INFO] "+format, args...)
+}
+
+func LogFlowLog(format string, args ...interface{}) {
+	log.Printf("[FLOW_LOG] "+format, args...)
+}
+
+func LogError(format string, args ...interface{}) {
+	log.Printf("[ERROR] "+format, args...)
+}
+
 func InitLogger() {
 	once.Do(func() {
 		log.SetFlags(log.Ldate | log.Ltime)
 		initZapLogger()
-		// Info("INIT_LOGGER")
+		Info("INIT_LOGGER")
 	})
 }
 
-// See https://pkg.go.dev/go.uber.org/zap
 func initZapLogger() {
 	log.Printf("log level: %v", logLevel.CapitalString())
 	encoderConfig := zapcore.EncoderConfig{
@@ -80,7 +94,6 @@ func GetLogger() *zap.Logger {
 	return zapLogger
 }
 
-// テスト用
 func LogStruct(s string, v interface{}) {
 	if v == nil {
 		fmt.Printf("----LogStruct-----%s---------\n", s)
@@ -90,7 +103,6 @@ func LogStruct(s string, v interface{}) {
 
 	val := reflect.ValueOf(v)
 
-	// ポインタの場合は中身を取得する
 	if val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			fmt.Printf("----LogStruct-----%s---------\n", s)
@@ -110,7 +122,6 @@ func LogStruct(s string, v interface{}) {
 			field := val.Field(i)
 			fieldName := typ.Field(i).Name
 
-			// 非エクスポートフィールドは出力しない
 			if !field.CanInterface() {
 				continue
 			}
@@ -140,7 +151,6 @@ func StructToJson(s string, v interface{}) {
 func FormatJSONPayload(s string, payload []byte) {
 	fmt.Println("FormatJSONPayload1")
 
-	// エスケープ文字の削除を行わない
 	cleanPayload := string(payload)
 	fmt.Println("Cleaned payload:", cleanPayload)
 

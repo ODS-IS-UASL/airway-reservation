@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"airway-reservation/internal/pkg/constant"
-	"airway-reservation/internal/pkg/database/interfaces"
+	"uasl-reservation/internal/pkg/constant"
+	"uasl-reservation/internal/pkg/database/interfaces"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 type TransactionDB struct {
@@ -21,11 +21,11 @@ type TransactionDB struct {
 func (t *TransactionDB) TransactionScope(ctx context.Context, fc func(context.Context, *interfaces.DB) error) (err error) {
 	panicked := true
 	if committer, ok := t.db.Gorm.Statement.ConnPool.(gorm.TxCommitter); ok && committer != nil {
-		// nested transaction
+
 		if !t.db.Gorm.DisableNestedTransaction {
 			err := t.db.Gorm.SavePoint(fmt.Sprintf("sp%p", fc)).Error
 			defer func() {
-				// Make sure to rollback when panic, Block error or Commit error
+
 				if panicked || err != nil {
 					t.db.Gorm.RollbackTo(fmt.Sprintf("sp%p", fc))
 				}
@@ -39,7 +39,7 @@ func (t *TransactionDB) TransactionScope(ctx context.Context, fc func(context.Co
 		tx := t.db.Gorm.Begin()
 
 		defer func() {
-			// Make sure to rollback when panic, Block error or Commit error
+
 			if panicked || err != nil {
 				tx.Rollback()
 			}
@@ -70,6 +70,13 @@ func SetDB(ctx context.Context, db *gorm.DB) context.Context {
 }
 
 func NewDB() *gorm.DB {
+	return NewDBWithName("")
+}
+
+func NewDBWithName(dbNameOverride string) *gorm.DB {
+	fmt.Println("データベースとの接続を開始します")
+	fmt.Println("APP_ENV: ", os.Getenv("APP_ENV"))
+	fmt.Println("ENV: ", os.Getenv("ENV"))
 
 	dbUser := os.Getenv("POSTGRES_USER")
 	dbPassword := os.Getenv("POSTGRES_PASSWORD")
@@ -77,13 +84,29 @@ func NewDB() *gorm.DB {
 	dbPort := os.Getenv("POSTGRES_PORT")
 	dbName := os.Getenv("POSTGRES_DB")
 
+	if dbNameOverride != "" {
+		dbName = dbNameOverride
+		fmt.Printf("Using override database name: %s\n", dbName)
+	}
+
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost, dbPort, dbUser, dbPassword, dbName)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println("データベースとの接続に成功しました")
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(2 * time.Minute)
+
+	fmt.Printf("データベース '%s' との接続に成功しました\n", dbName)
 	return db
 }
 

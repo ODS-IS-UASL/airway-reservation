@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"airway-reservation/internal/pkg/constant"
+	"uasl-reservation/internal/pkg/constant"
 )
 
 type Timestamp time.Time

@@ -1,0 +1,16 @@
+# バージョン管理関連
+.git
+.gitignore
+
+# ビルドされたファイルやキャッシュ
+bin/
+tmp/
+node_modules/
+*.log
+
+# 環境設定ファイル
+.env
+*.env
+
+# 無視するコンテナ関連
+docker-compose.*.yml

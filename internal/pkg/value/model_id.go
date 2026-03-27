@@ -3,8 +3,8 @@ package value
 import (
 	"database/sql"
 
-	"airway-reservation/internal/pkg/myerror"
-	"airway-reservation/internal/pkg/util"
+	"uasl-reservation/internal/pkg/myerror"
+	"uasl-reservation/internal/pkg/util"
 
 	uuid "github.com/satori/go.uuid"
 )

@@ -23,7 +23,7 @@ func NewMQTTClient() (mqttClient, error) {
 		return mqttClient{}, nil
 	}
 
-	clientID := fmt.Sprintf("airway-service-%d", time.Now().UnixNano())
+	clientID := fmt.Sprintf("uasl-service-%d", time.Now().UnixNano())
 	cert, err := os.ReadFile(filepath.Join(".", "broker.crt"))
 	if err != nil {
 		return mqttClient{}, err
@@ -34,17 +34,16 @@ func NewMQTTClient() (mqttClient, error) {
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:            certPool,
-		InsecureSkipVerify: true,
-		// InsecureSkipVerify: false,
+		InsecureSkipVerify: false,
 	}
 	opts := mqtt.NewClientOptions()
-	// opts.AddBroker(conf.Broker)
+
 	opts.AddBroker(fmt.Sprintf("mqtts://%s:8883", os.Getenv("BROKER_ENDPOINT")))
 	opts.SetClientID(clientID)
 	opts.SetTLSConfig(tlsConfig)
 	opts.SetCleanSession(true)
 	opts.SetConnectTimeout(10 * time.Second)
-	// opts.SetDefaultPublishHandler(messageHandler)
+
 	opts.SetKeepAlive(60 * time.Second)
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {

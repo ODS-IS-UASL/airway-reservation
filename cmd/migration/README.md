@@ -4,7 +4,7 @@
 - [sql-migrate](https://github.com/rubenv/sql-migrate)
 
 ## How to create migration file
-- Target folder is `databases/migration/$service_name}`.
+- Target folder is `database/migration/$schema_name`.
 - The migration file must have a 4-digit sequential ${number}_file_name.sql (ex: 0005_hogefuga.sql), and the contents of the file must contain
 
 ``` sql
@@ -19,4 +19,9 @@
 ## Usage
 
 1. `docker-compose -f docker-compose.local.yml up -d postgres`
-2. `go run ./cmd/migration/main.go schema apply -r $PWD/databases/migrate/${service_name} -u ${USER} -p 5432 -P ${PASSWORD}  --dbname ${service_name}`
+2. `go run ./cmd/migration/main.go schema apply -r $PWD/database/migration/uasl_reservation --schema-name uasl_reservation -u ${USER} -p 5432 -P ${PASSWORD} --dbname ${DB_NAME}`
+3. `go run ./cmd/migration/main.go seed -u ${USER} -p 5432 -P ${PASSWORD} --dbname ${DB_NAME}`
+
+## Notes
+
+- UASL reservation related migrations are under `database/migration/uasl_reservation`.

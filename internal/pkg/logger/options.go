@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"airway-reservation/internal/pkg/config"
+	"uasl-reservation/internal/pkg/config"
 
 	"go.uber.org/zap/zapcore"
 )

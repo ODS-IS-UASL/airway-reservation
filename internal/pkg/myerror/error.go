@@ -15,6 +15,11 @@ type CustomError struct {
 	infoMessage string // infoMessage show as client error message
 }
 
+// Unwrapメソッドを追加してエラーチェーンをサポート
+func (e CustomError) Unwrap() error {
+	return e.err
+}
+
 func (e CustomError) Error() string {
 	return e.infoMessage
 }
@@ -32,8 +37,6 @@ func Errorf(c Code, format string, a ...interface{}) error {
 }
 
 func Wrap(c Code, err error, infoMessage string) error {
-
-	// logger.Errorf(Cause(err).Error(), err)
 	return CustomError{
 		code:        c,
 		err:         errors.Wrap(err, infoMessage),
@@ -60,13 +63,23 @@ func StackTrace(err error) string {
 func ToHTTPStatus(err error) int {
 	switch GetCode(err) {
 	case BadRequest:
-		return http.StatusBadRequest // 400 Bad Request
+		return http.StatusBadRequest
 	case NotFound:
-		return http.StatusNotFound // 404
-	case Internal:
-		return http.StatusInternalServerError // 500
+		return http.StatusNotFound
+	case Auth:
+		return http.StatusUnauthorized
+	case Forbidden:
+		return http.StatusForbidden
+	case Conflict:
+		return http.StatusConflict
+	case Timeout:
+		return http.StatusRequestTimeout
+	case TooManyRequests:
+		return http.StatusTooManyRequests
+	case Connection:
+		return http.StatusServiceUnavailable
 	default:
-		return http.StatusInternalServerError // 500
+		return http.StatusInternalServerError
 	}
 }
 

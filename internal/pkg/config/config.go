@@ -16,12 +16,14 @@ type Config struct {
 	DynamoConfig       DynamoConfig
 	MQTTConfig         MQTTConfig
 	S3Config           S3Config
+	CognitoConfig      CognitoConfig
 }
 
 type ServerConfig struct {
 	Environment string `envconfig:"APP_ENV" default:"local"`
 	RESTPort    int    `envconfig:"REST_PORT" required:"false" default:"8080"`
 	GiGRPCPort  int    `envconfig:"GI_GRPC_PORT" required:"false" default:"8084"`
+	OpGRPCPort  int    `envconfig:"OP_GRPC_PORT" required:"false" default:"8085"`
 }
 
 type SyncerServerConfig struct {
@@ -53,7 +55,7 @@ type KafkaConfig struct {
 }
 
 type DynamoConfig struct {
-	Region   string `envconfig:"DYNAMO_REGION" required:"false" default:"ap-northeast-1"`
+	Region   string `envconfig:"AWS_REGION" required:"false" default:"ap-northeast-1"`
 	Endpoint string `envconfig:"DYNAMO_ENDPOINT" required:"false"`
 	Timeout  int    `envconfig:"DYNAMO_TIMEOUT" required:"false" default:"10"`
 }
@@ -67,7 +69,12 @@ type MQTTConfig struct {
 }
 
 type S3Config struct {
-	Region string `envconfig:"S3_REGION" required:"false" default:"ap-northeast-1"`
+	Region string `envconfig:"AWS_REGION" required:"false" default:"ap-northeast-1"`
+}
+
+type CognitoConfig struct {
+	SystemUserPoolID    string `envconfig:"SYSTEM_USER_POOL_ID" required:"false"`
+	OperationUserPoolID string `envconfig:"OPERATION_USER_POOL_ID" required:"false"`
 }
 
 var c *Config
